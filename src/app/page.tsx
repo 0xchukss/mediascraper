@@ -5,18 +5,7 @@ import SearchBar from '@/components/SearchBar';
 import ResultsGrid from '@/components/ResultsGrid';
 import VideoPlayer from '@/components/VideoPlayer';
 
-interface ResultItem {
-  id: string;
-  source: string;
-  title: string;
-  type: string;
-  year?: string;
-  thumbnail: string;
-  downloadUrl: string;
-  description?: string;
-  downloads?: number;
-  tags?: string[];
-}
+import { ResultItem } from '@/types';
 
 export default function Home() {
   const [results, setResults] = useState<ResultItem[]>([]);

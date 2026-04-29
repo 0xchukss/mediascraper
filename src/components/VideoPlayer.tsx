@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { ResultItem } from '@/types';
 
 interface VideoPlayerProps {
-  item: any;
+  item: ResultItem;
   onClose: () => void;
   onClip: (start: number, end: number) => void;
 }

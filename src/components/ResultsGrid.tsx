@@ -1,18 +1,7 @@
 'use client';
 
+import { ResultItem } from '@/types';
 import ResultCard from './ResultCard';
-
-interface ResultItem {
-  id: string;
-  source: string;
-  title: string;
-  type: string;
-  thumbnail: string;
-  url: string;
-  year: string;
-  description: string;
-  downloadUrl: string;
-}
 
 interface ResultsGridProps {
   results: ResultItem[];
