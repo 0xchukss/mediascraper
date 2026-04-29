@@ -1,36 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Universal Media Scraper
 
-## Getting Started
+A high-performance web tool for instantly searching, trimming, and downloading public domain media for YouTube video automation.
 
-First, run the development server:
+## Features
+- **6-Source Aggregator**: Prelinger Archives, Library of Congress, Smithsonian, Google, Pexels, and Pixabay.
+- **Precision Trimming**: Centered dual-handle slider for frame-accurate clipping.
+- **Direct PC Download**: Saves assets directly to your system's `Downloads/VintageAssets` folder.
+- **Workflow Optimization**: Drag-and-drop support for CapCut and one-click "Copy Path" buttons.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Setup
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+1. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+2. **Configure API Keys** (Optional):
+   Create a `.env.local` file and add your keys for higher rate limits:
+   ```env
+   SMITHSONIAN_API_KEY=your_key
+   PEXELS_API_KEY=your_key
+   PIXABAY_API_KEY=your_key
+   GOOGLE_API_KEY=your_key
+   GOOGLE_CX=your_cx
+   ```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3. **Run Locally**:
+   ```bash
+   npm run dev
+   ```
 
-## Learn More
+## Deployment Note
 
-To learn more about Next.js, take a look at the following resources:
+This tool is optimized for **Local Development**. 
+- **Saving to PC**: The automated "Save to Downloads" and "Open Folder" features require a local Node.js environment.
+- **Hosted Environments (Vercel)**: While you can deploy the search interface to Vercel, the local file system interactions (saving directly to your PC) will be disabled. In a hosted environment, you should use standard browser downloads.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+Public Domain / MIT
