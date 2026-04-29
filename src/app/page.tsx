@@ -5,14 +5,27 @@ import SearchBar from '@/components/SearchBar';
 import ResultsGrid from '@/components/ResultsGrid';
 import VideoPlayer from '@/components/VideoPlayer';
 
+interface ResultItem {
+  id: string;
+  source: string;
+  title: string;
+  type: string;
+  year?: string;
+  thumbnail: string;
+  downloadUrl: string;
+  description?: string;
+  downloads?: number;
+  tags?: string[];
+}
+
 export default function Home() {
-  const [results, setResults] = useState([]);
+  const [results, setResults] = useState<ResultItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isPlayerLoading, setIsPlayerLoading] = useState(false);
-  const [downloadingItems, setDownloadingItems] = useState(new Set());
+  const [downloadingItems, setDownloadingItems] = useState(new Set<string>());
   const [selectedIds, setSelectedIds] = useState(new Set<string>());
   const [downloadedPaths, setDownloadedPaths] = useState<Record<string, string>>({});
-  const [activeVideo, setActiveVideo] = useState<any>(null);
+  const [activeVideo, setActiveVideo] = useState<ResultItem | null>(null);
 
   const handleSearch = async (query: string, type: string, era: string) => {
     setIsLoading(true);
