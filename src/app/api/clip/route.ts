@@ -7,7 +7,7 @@ import os from 'os';
 
 // Ensure absolute path for FFmpeg on Windows
 const ffmpegStatic = require('ffmpeg-static');
-let ffmpegPath = path.resolve(ffmpegStatic);
+let ffmpegPath = path.resolve(/* turbopackIgnore: true */ ffmpegStatic);
 
 // Fix for potential "ROOT" path issue in some environments
 if (ffmpegPath.includes('\\ROOT\\')) {
