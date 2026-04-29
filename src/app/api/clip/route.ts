@@ -32,8 +32,8 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 
 export async function POST(request: Request) {
   try {
-    const { item, start, end } = await request.json();
-
+    const { item, start, end, customName } = await request.json();
+    
     if (!item || start === undefined || end === undefined) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'End time must be after start time' }, { status: 400 });
     }
     const cleanName = item.title.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
-    const clipFilename = `clip_${Math.floor(start)}s_${Math.floor(end)}s_${cleanName}.mp4`;
+    const clipFilename = customName ? `${customName}.mp4` : `clip_${Math.floor(start)}s_${Math.floor(end)}s_${cleanName}.mp4`;
     const outputPath = path.join(downloadDir, clipFilename);
 
     // We need the direct video URL. 

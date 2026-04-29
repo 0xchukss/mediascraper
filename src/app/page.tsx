@@ -7,7 +7,10 @@ import VideoPlayer from '@/components/VideoPlayer';
 
 import { ResultItem } from '@/types';
 
+import ScriptSequencer from '@/components/ScriptSequencer';
+
 export default function Home() {
+  const [activeTab, setActiveTab] = useState<'search' | 'script'>('search');
   const [results, setResults] = useState<ResultItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isPlayerLoading, setIsPlayerLoading] = useState(false);
@@ -41,7 +44,6 @@ export default function Home() {
   const handleOpenPlayer = async (item: ResultItem) => {
     setIsPlayerLoading(true);
     try {
-      // For Internet Archive, we need to find the actual MP4 file from the metadata
       if (item.source === 'Internet Archive') {
         const metaUrl = `https://archive.org/metadata/${item.id}`;
         const response = await fetch(metaUrl);
@@ -93,6 +95,33 @@ export default function Home() {
     }
   };
 
+  const triggerClip = async (item: ResultItem, start: number, end: number, customName?: string) => {
+    setDownloadingItems((prev) => new Set(prev).add(`${item.id}_clip`));
+    try {
+      const response = await fetch('/api/clip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item, start, end, customName }),
+      });
+      const data = await response.json();
+      
+      if (data.status === 'success') {
+        alert(`Clip saved: ${data.filename}`);
+        setDownloadedPaths(prev => ({ ...prev, [item.id]: data.path }));
+      } else {
+        alert(`Clipping Error: ${data.error}\nPath: ${data.path}`);
+      }
+    } catch (error) {
+      console.error('Clipping failed:', error);
+    } finally {
+      setDownloadingItems((prev) => {
+        const next = new Set(prev);
+        next.delete(`${item.id}_clip`);
+        return next;
+      });
+    }
+  };
+
   const handleBatchDownload = async () => {
     const itemsToDownload = results.filter((item) => selectedIds.has(item.id));
     if (itemsToDownload.length === 0) return;
@@ -127,72 +156,68 @@ export default function Home() {
     }
   };
 
-  const handleClip = async (start: number, end: number) => {
-    if (!activeVideo) return;
-    
-    setDownloadingItems((prev) => new Set(prev).add(`${activeVideo.id}_clip`));
-    try {
-      const response = await fetch('/api/clip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ item: activeVideo, start, end }),
-      });
-      const data = await response.json();
-      
-      if (data.status === 'success') {
-        alert(`Clip saved: ${data.filename}`);
-        setDownloadedPaths(prev => ({ ...prev, [activeVideo.id]: data.path }));
-        setActiveVideo(null);
-      } else {
-        alert(`Clipping Error: ${data.error}\nPath: ${data.path}`);
-      }
-    } catch (error) {
-      console.error('Clipping failed:', error);
-    } finally {
-      setDownloadingItems((prev) => {
-        const next = new Set(prev);
-        next.delete(`${activeVideo.id}_clip`);
-        return next;
-      });
-    }
-  };
-
   return (
     <main>
-      <header style={{ marginBottom: '2rem' }}>
-        <h1>Vintage Media Scraper</h1>
-        <p style={{ color: 'var(--text-muted)' }}>
-          High-speed public domain asset finder for YouTube automation.
-        </p>
-      </header>
-
-      <SearchBar onSearch={handleSearch} isLoading={isLoading} />
-
-      <section>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: '600' }}>
-            {results.length > 0 ? `Showing ${results.length} results` : 'Recent Assets'}
-          </h2>
-          {selectedIds.size > 0 && (
-            <button 
-              className="primary" 
-              style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
-              onClick={handleBatchDownload}
-            >
-              Batch Download ({selectedIds.size})
-            </button>
-          )}
+      <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        <div>
+          <h1>Vintage Media Scraper</h1>
+          <p style={{ color: 'var(--text-muted)' }}>
+            High-speed public domain asset finder for YouTube automation.
+          </p>
         </div>
         
-        <ResultsGrid 
-          results={results} 
-          onDownload={handleDownload} 
-          selectedIds={selectedIds}
-          onSelect={toggleSelect}
-          onOpenPlayer={handleOpenPlayer}
-          downloadedPaths={downloadedPaths}
+        <nav className="tab-nav">
+          <button 
+            className={`tab-btn ${activeTab === 'search' ? 'active' : ''}`}
+            onClick={() => setActiveTab('search')}
+          >
+            Manual Search
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === 'script' ? 'active' : ''}`}
+            onClick={() => setActiveTab('script')}
+          >
+            Script Sequence
+          </button>
+        </nav>
+      </header>
+
+      {activeTab === 'search' ? (
+        <>
+          <SearchBar onSearch={handleSearch} isLoading={isLoading} />
+
+          <section>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: '600' }}>
+                {results.length > 0 ? `Showing ${results.length} results` : 'Recent Assets'}
+              </h2>
+              {selectedIds.size > 0 && (
+                <button 
+                  className="primary" 
+                  style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+                  onClick={handleBatchDownload}
+                >
+                  Batch Download ({selectedIds.size})
+                </button>
+              )}
+            </div>
+            
+            <ResultsGrid 
+              results={results} 
+              onDownload={handleDownload} 
+              selectedIds={selectedIds}
+              onSelect={toggleSelect}
+              onOpenPlayer={handleOpenPlayer}
+              downloadedPaths={downloadedPaths}
+            />
+          </section>
+        </>
+      ) : (
+        <ScriptSequencer 
+          onDownloadScene={triggerClip}
+          isDownloading={(id) => downloadingItems.has(id)}
         />
-      </section>
+      )}
 
       {isPlayerLoading && (
         <div style={{
@@ -217,7 +242,10 @@ export default function Home() {
         <VideoPlayer 
           item={activeVideo} 
           onClose={() => setActiveVideo(null)} 
-          onClip={handleClip}
+          onClip={(start, end) => {
+            triggerClip(activeVideo, start, end);
+            setActiveVideo(null);
+          }}
         />
       )}
 
