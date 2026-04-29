@@ -1,0 +1,111 @@
+import { NextResponse } from 'next/server';
+import ffmpeg from 'fluent-ffmpeg';
+import path from 'path';
+import fs from 'fs-extra';
+import axios from 'axios';
+import os from 'os';
+
+// Ensure absolute path for FFmpeg on Windows
+const ffmpegStatic = require('ffmpeg-static');
+let ffmpegPath = path.resolve(ffmpegStatic);
+
+// Fix for potential "ROOT" path issue in some environments
+if (ffmpegPath.includes('\\ROOT\\')) {
+  const actualRoot = process.cwd().split('Downloads')[0];
+  ffmpegPath = ffmpegPath.replace('C:\\ROOT\\', actualRoot);
+}
+
+console.log('Constructed FFmpeg Path:', ffmpegPath);
+
+// Verify if file exists at this path
+if (!fs.existsSync(ffmpegPath)) {
+  console.error('FFmpeg binary NOT found at:', ffmpegPath);
+  // Fallback to searching in node_modules relative to cwd
+  const fallbackPath = path.join(process.cwd(), 'node_modules', 'ffmpeg-static', 'ffmpeg.exe');
+  if (fs.existsSync(fallbackPath)) {
+    ffmpegPath = fallbackPath;
+    console.log('Using fallback FFmpeg Path:', ffmpegPath);
+  }
+}
+
+ffmpeg.setFfmpegPath(ffmpegPath);
+
+export async function POST(request: Request) {
+  try {
+    const { item, start, end } = await request.json();
+
+    if (!item || start === undefined || end === undefined) {
+      return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+    }
+
+    const downloadDir = path.join(os.homedir(), 'Downloads', 'VintageAssets');
+    const tempDir = path.join(os.homedir(), 'Downloads', 'VintageAssets', 'temp');
+    await fs.ensureDir(downloadDir);
+    await fs.ensureDir(tempDir);
+
+    const duration = end - start;
+    if (duration <= 0) {
+      return NextResponse.json({ error: 'End time must be after start time' }, { status: 400 });
+    }
+    const cleanName = item.title.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
+    const clipFilename = `clip_${Math.floor(start)}s_${Math.floor(end)}s_${cleanName}.mp4`;
+    const outputPath = path.join(downloadDir, clipFilename);
+
+    // We need the direct video URL. 
+    // If it's an IA item, we might need to find the MP4 again.
+    let videoUrl = item.downloadUrl;
+    if (item.source === 'Internet Archive' && !videoUrl.endsWith('.mp4')) {
+      const metaUrl = `https://archive.org/metadata/${item.id}`;
+      const metaResponse = await axios.get(metaUrl);
+      const files = metaResponse.data.files || [];
+      const mp4File = files.find((f: any) => f.name.endsWith('.mp4') && !f.name.includes('ia.mp4'));
+      if (mp4File) {
+        videoUrl = `https://archive.org/download/${item.id}/${mp4File.name}`;
+      }
+    }
+
+    console.log(`Clipping from ${videoUrl} starting at ${start} for ${duration}s`);
+
+    await new Promise((resolve, reject) => {
+      ffmpeg(videoUrl)
+        .setStartTime(start)
+        .setDuration(duration)
+        .output(outputPath)
+        .on('end', () => {
+          console.log('Clipping finished');
+          resolve(true);
+        })
+        .on('error', (err) => {
+          console.error('FFmpeg error:', err);
+          reject(err);
+        })
+        .run();
+    });
+
+    // Save metadata for the clip
+    const metadataPath = path.join(downloadDir, 'metadata.json');
+    let metadata = [];
+    if (await fs.pathExists(metadataPath)) {
+      metadata = await fs.readJson(metadataPath);
+    }
+    metadata.push({
+      ...item,
+      id: `${item.id}_clip_${start}_${end}`,
+      title: `${item.title} (Clip ${start}s-${end}s)`,
+      localPath: outputPath,
+      type: 'video-clip',
+      start,
+      end,
+      downloadedAt: new Date().toISOString(),
+    });
+    await fs.writeJson(metadataPath, metadata, { spaces: 2 });
+
+    return NextResponse.json({ status: 'success', path: outputPath, filename: clipFilename });
+  } catch (error: any) {
+    console.error('Clipping failed:', error);
+    return NextResponse.json({ 
+      error: error.message || 'Clipping failed',
+      path: ffmpegPath 
+    }, { status: 500 });
+  }
+}
