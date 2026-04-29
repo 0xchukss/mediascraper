@@ -38,8 +38,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
 
-    const downloadDir = path.join(os.homedir(), 'Downloads', 'VintageAssets');
-    const tempDir = path.join(os.homedir(), 'Downloads', 'VintageAssets', 'temp');
+    // Detect if running on Vercel/Serverless
+    const isVercel = process.env.VERCEL === '1';
+    const baseDir = isVercel ? '/tmp' : path.join(os.homedir(), 'Downloads');
+    
+    const downloadDir = baseDir;
+    const tempDir = path.join(baseDir, 'temp');
     await fs.ensureDir(downloadDir);
     await fs.ensureDir(tempDir);
 

@@ -12,7 +12,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Items array is required' }, { status: 400 });
     }
 
-    const downloadDir = path.join(os.homedir(), 'Downloads', 'VintageAssets');
+    // Detect if running on Vercel/Serverless
+    const isVercel = process.env.VERCEL === '1';
+    const baseDir = isVercel ? '/tmp' : path.join(os.homedir(), 'Downloads');
+    
+    const downloadDir = baseDir;
     await fs.ensureDir(downloadDir);
 
     const results = await Promise.all(items.map(async (item: any) => {
