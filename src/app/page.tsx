@@ -49,7 +49,7 @@ export default function Home() {
     });
   };
 
-  const handleOpenPlayer = async (item: any) => {
+  const handleOpenPlayer = async (item: ResultItem) => {
     setIsPlayerLoading(true);
     try {
       // For Internet Archive, we need to find the actual MP4 file from the metadata
@@ -77,7 +77,7 @@ export default function Home() {
     }
   };
 
-  const handleDownload = async (item: any) => {
+  const handleDownload = async (item: ResultItem) => {
     setDownloadingItems((prev) => new Set(prev).add(item.id));
     try {
       const response = await fetch('/api/download', {
@@ -105,7 +105,7 @@ export default function Home() {
   };
 
   const handleBatchDownload = async () => {
-    const itemsToDownload = results.filter((item: any) => selectedIds.has(item.id));
+    const itemsToDownload = results.filter((item) => selectedIds.has(item.id));
     if (itemsToDownload.length === 0) return;
 
     itemsToDownload.forEach(item => setDownloadingItems(prev => new Set(prev).add(item.id)));
