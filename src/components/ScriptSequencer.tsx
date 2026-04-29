@@ -25,16 +25,17 @@ export default function ScriptSequencer({ onDownloadScene, isDownloading }: Scri
 
   const parseScript = () => {
     setIsProcessing(true);
-    // Split by double newline or specific scene markers
-    const segments = script.split(/\n\n+/).filter(s => s.trim().length > 5);
+    // Split by sentences or double newlines to get better scenes
+    const segments = script.split(/\n\n+|(?<=[.!?])\s+/).filter(s => s.trim().length > 10);
     
     const newScenes: Scene[] = segments.map((text, index) => {
-      // Basic keyword extraction: remove common stop words and keep interesting nouns/verbs
+      // Improved keyword extraction: take first 3 unique words with > 3 chars
       const keywords = text.toLowerCase()
         .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "")
         .split(' ')
-        .filter(w => w.length > 4)
-        .slice(0, 5)
+        .filter(w => w.length > 3)
+        .filter((v, i, a) => a.indexOf(v) === i)
+        .slice(0, 3)
         .join(' ');
 
       return {
@@ -44,7 +45,7 @@ export default function ScriptSequencer({ onDownloadScene, isDownloading }: Scri
         results: [],
         selectedClip: null,
         status: 'idle',
-        timeRange: { start: 0, end: 5 } // Default 5s clip
+        timeRange: { start: 0, end: 5 }
       };
     });
 
@@ -59,18 +60,21 @@ export default function ScriptSequencer({ onDownloadScene, isDownloading }: Scri
     setScenes(prev => prev.map(s => s.id === sceneId ? { ...s, status: 'searching' } : s));
     
     try {
-      // Use existing search API
+      // Use existing search API, specifically requesting VIDEOS for the sequencer
       const response = await fetch(`/api/search?q=${encodeURIComponent(keywords)}&type=video&era=vintage`);
       const data = await response.json();
       const results = data.results || [];
+      
+      // Filter for videos only to satisfy user request
+      const videosOnly = results.filter((r: ResultItem) => r.type === 'video');
 
       setScenes(prev => prev.map(s => {
         if (s.id === sceneId) {
           return { 
             ...s, 
-            results, 
-            status: results.length > 0 ? 'matched' : 'idle',
-            selectedClip: results[0] || null 
+            results: videosOnly, 
+            status: videosOnly.length > 0 ? 'matched' : 'idle',
+            selectedClip: videosOnly[0] || null 
           };
         }
         return s;
@@ -81,94 +85,107 @@ export default function ScriptSequencer({ onDownloadScene, isDownloading }: Scri
     }
   };
 
-  const updateSceneClip = (sceneId: number, clip: ResultItem) => {
-    setScenes(prev => prev.map(s => s.id === sceneId ? { ...s, selectedClip: clip } : s));
+  const handleBatchDownloadAll = async () => {
+    for (const scene of scenes) {
+      if (scene.selectedClip) {
+        const sanitized = scene.text.substring(0, 15).replace(/[^a-z0-9]/gi, '_');
+        const customName = `Scene_${String(scene.id + 1).padStart(2, '0')}_${sanitized}`;
+        await onDownloadScene(scene.selectedClip, scene.timeRange.start, scene.timeRange.end, customName);
+      }
+    }
+    alert('All sequenced scenes have been queued for download!');
   };
 
   return (
     <div className="script-sequencer">
       <div className="script-input-area">
-        <label style={{ fontWeight: '700', color: 'var(--primary)' }}>Video Script Editor</label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <label style={{ fontWeight: '700', color: 'var(--primary)' }}>Script Arranger (Video Sequence)</label>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Auto-targets: Prelinger & LOC Videos</div>
+        </div>
         <textarea 
           className="script-textarea"
-          placeholder="Paste your video script here. Each paragraph will be treated as a separate scene..."
+          placeholder="Enter your script. Example: 'A man walks down a rainy street in the 1940s. He enters a busy diner...'"
           value={script}
           onChange={(e) => setScript(e.target.value)}
         />
-        <button 
-          className="primary" 
-          onClick={parseScript} 
-          disabled={isProcessing || !script.trim()}
-          style={{ alignSelf: 'flex-end' }}
-        >
-          {isProcessing ? 'Processing...' : 'Generate Sequence'}
-        </button>
+        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+          {scenes.length > 0 && (
+            <button className="secondary-btn" onClick={() => setScenes([])} style={{ padding: '0.75rem 1.5rem' }}>
+              Clear
+            </button>
+          )}
+          <button 
+            className="primary" 
+            onClick={parseScript} 
+            disabled={isProcessing || !script.trim()}
+          >
+            {isProcessing ? 'Processing...' : 'Arrange Sequence'}
+          </button>
+        </div>
       </div>
 
       {scenes.length > 0 && (
         <div className="timeline">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ color: 'var(--text-muted)' }}>Script Timeline ({scenes.length} Scenes)</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 1rem' }}>
+            <h3 style={{ color: '#fff', fontSize: '1.25rem' }}>Sequence Timeline</h3>
+            <button 
+              className="primary" 
+              onClick={handleBatchDownloadAll}
+              style={{ fontSize: '0.9rem', padding: '0.5rem 1.5rem' }}
+            >
+              Download All Scenes
+            </button>
           </div>
           
-          {scenes.map((scene) => (
-            <div key={scene.id} className="scene-card">
-              <div className="scene-text">
-                <div style={{ fontSize: '0.8rem', opacity: 0.5, marginBottom: '0.5rem' }}>SCENE {scene.id + 1}</div>
-                {scene.text}
-              </div>
-
-              <div className="scene-clip-selector">
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Auto-matched Clips:
-                </div>
-                <div className="mini-results">
-                  {scene.status === 'searching' && <div className="status-badge searching">Searching...</div>}
-                  {scene.results.length === 0 && scene.status === 'idle' && <div style={{ fontSize: '0.8rem' }}>No matches found.</div>}
-                  {scene.results.map((result) => (
-                    <img 
-                      key={result.id}
-                      src={result.thumbnail}
-                      className={`mini-thumb ${scene.selectedClip?.id === result.id ? 'active' : ''}`}
-                      onClick={() => updateSceneClip(scene.id, result)}
-                      title={result.title}
-                    />
-                  ))}
-                </div>
+          <div className="film-strip">
+            {scenes.map((scene, index) => (
+              <div key={scene.id} className="scene-card horizontal">
+                <div className="scene-number">{index + 1}</div>
                 
-                {scene.selectedClip && (
-                  <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '0.5rem' }}>
-                    <div style={{ fontSize: '0.8rem' }}>
-                      Selected: <span style={{ color: 'var(--primary)' }}>{scene.selectedClip.title.substring(0, 30)}...</span>
-                    </div>
+                <div className="scene-content">
+                  <div className="scene-header">
+                    <span className="keywords-badge">Keywords: {scene.keywords}</span>
+                    <span className={`status-badge ${scene.status}`}>{scene.status}</span>
                   </div>
-                )}
-              </div>
+                  <div className="scene-text-preview">{scene.text}</div>
+                </div>
 
-              <div className="scene-actions">
-                <div className={`status-badge ${scene.status}`}>
-                  {scene.status}
+                <div className="scene-media-area">
+                  <div className="mini-results scrollable">
+                    {scene.results.map((result) => (
+                      <div 
+                        key={result.id} 
+                        className={`mini-thumb-container ${scene.selectedClip?.id === result.id ? 'active' : ''}`}
+                        onClick={() => updateSceneClip(scene.id, result)}
+                      >
+                        <img src={result.thumbnail} className="mini-thumb" />
+                        <div className="source-label">{result.source.split(' ')[0]}</div>
+                      </div>
+                    ))}
+                    {scene.status === 'searching' && <div className="loader">Searching Videos...</div>}
+                    {scene.status === 'idle' && scene.results.length === 0 && <div className="no-matches">No Videos Found</div>}
+                  </div>
                 </div>
-                <button 
-                  className="primary"
-                  style={{ padding: '0.5rem', fontSize: '0.8rem' }}
-                  disabled={!scene.selectedClip || isDownloading(`${scene.selectedClip.id}_clip`)}
-                  onClick={() => {
-                    if (scene.selectedClip) {
-                      const sanitized = scene.text.substring(0, 15).replace(/[^a-z0-9]/gi, '_');
-                      const customName = `Scene_${String(scene.id + 1).padStart(2, '0')}_${sanitized}`;
-                      onDownloadScene(scene.selectedClip, scene.timeRange.start, scene.timeRange.end, customName);
-                    }
-                  }}
-                >
-                  {isDownloading(`${scene.selectedClip?.id}_clip`) ? 'Downloading...' : 'Download Clip'}
-                </button>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-                  Default Range: {scene.timeRange.start}s - {scene.timeRange.end}s
+
+                <div className="scene-final-action">
+                  <button 
+                    className="download-scene-btn"
+                    disabled={!scene.selectedClip || isDownloading(`${scene.selectedClip.id}_clip`)}
+                    onClick={() => {
+                      if (scene.selectedClip) {
+                        const sanitized = scene.text.substring(0, 15).replace(/[^a-z0-9]/gi, '_');
+                        const customName = `Scene_${String(scene.id + 1).padStart(2, '0')}_${sanitized}`;
+                        onDownloadScene(scene.selectedClip, scene.timeRange.start, scene.timeRange.end, customName);
+                      }
+                    }}
+                  >
+                    {isDownloading(`${scene.selectedClip?.id}_clip`) ? '...' : '↓'}
+                  </button>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </div>
